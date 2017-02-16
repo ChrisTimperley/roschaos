@@ -3,12 +3,21 @@ import argparse
 
 def action_kill_node(args):
     return kill_node(args.name)
+
+# TODO: Certain "respawing" nodes will refuse to die (http://wiki.ros.org/rosnode)
 def kill_node(node_name):
     print("Killing node: {}".format(node_name))
+
+    # sanity check: is this a legal ROS node name? If not, we could abuse this to perform
+    # shell injection. Probably not an issue in the context we're using it, but it's worth
+    # keeping in mind.
 
     # sanity check: is ROS running?
 
     # sanity check: is there a node with the given name running?
+
+    # did we kill the node?
+
 
 def main():
     parser = argparse.ArgumentParser()
