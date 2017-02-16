@@ -6,6 +6,10 @@ def action_kill_node(args):
 def kill_node(node_name):
     print("Killing node: {}".format(node_name))
 
+    # sanity check: is ROS running?
+
+    # sanity check: is there a node with the given name running?
+
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers() 
