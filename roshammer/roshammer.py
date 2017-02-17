@@ -59,7 +59,7 @@ def kill_node(node_name):
     # sanity check: is there a node with the given name running?
     
     try:
-        execute("roskill {}".format(node_name))
+        execute("rosnode kill {}".format(node_name))
     except ProcessNonZeroExitException as e:
         err("failed to kill node - non-zero exit status ({}):\n{}".format(e.code, e.stderr))
     except ProcessTimedOutException as e:
