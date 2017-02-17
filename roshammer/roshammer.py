@@ -3,10 +3,11 @@ import os
 import subprocess
 import sys
 import argparse
+from subprocess import Popen, PIPE
 
 # Thrown when a called process yields a non-zero exit status
 class ProcessNonZeroExitException(Exception):
-    def __init__(code, stderr):
+    def __init__(self, code, stderr):
         super().__init__()
         self.code = code
         self.stderr = stderr
@@ -28,7 +29,7 @@ def execute(cmd, timeout=5):
     # TODO: although it's better to avoid sharing the same shell as the program, we do
     #   so to avoid having to reload the catkin workspace. No big deal.
     # NOTE: os.setsid is used to ensure we kill all children in the progress group
-    with Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=suprocess.PIPE, preexec_fn=os.setsid) as p:
+    with Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, preexec_fn=os.setsid) as p:
         try:
             # convert stdout and stderr to strings
             stdout, stderr = p.communicate(timeout=timeout)
