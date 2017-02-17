@@ -1,11 +1,42 @@
 #!/usr/bin/python3
-from subprocess import Popen, PIPE
+import os
+import subprocess
 import sys
 import argparse
+
+# Thrown when a called process yields a non-zero exit status
+class ProcessNonZeroExitException(Exception):
+    pass
+class ProcessTimedOutException(Exception):
+    pass
 
 def err(msg):
     print("ERROR: {}".format(msg))
     sys.exit(1)
+
+# Executes a given command and returns the standard output if the process exited
+# with a non-zero status. If the process timed out, or a non-zero exit status occurred,
+# an appropriate exception is thrown.
+def execute(cmd, timeout=5):
+
+    # TODO: although it's better to avoid sharing the same shell as the program, we do
+    #   so to avoid having to reload the catkin workspace. No big deal.
+    # NOTE: os.setsid is used to ensure we kill all children in the progress group
+    with Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=suprocess.PIPE, preexec_fn=os.setsid) as p:
+        try:
+            # convert stdout and stderr to strings
+            stdout, stderr = p.communicate(timeout=time_limit)
+            stdout = str(stdout)[2:-1]
+            stderr = str(stderr)[2:-1]
+            retcode = p.returncode
+
+            if retcode != 0:
+                raise ProcessNonZeroExitException(retcode, stderr)
+            return stdout
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)
+            raise ProcessTimedOutException()
+
 
 # TODO: Certain "respawing" nodes will refuse to die (http://wiki.ros.org/rosnode)
 def kill_node(node_name):
@@ -19,22 +50,12 @@ def kill_node(node_name):
 
     # sanity check: is there a node with the given name running?
     
-    # TODO: although it's better to avoid sharing the same shell as the program, we do
-    #   so to avoid having to reload the catkin workspace. No big deal.
-    # NOTE: os.setsid is used to ensure we kill all children in the progress group
-    time_limit = 5.0 # seconds
-    cmd = "roskill {}".format(node_name)
-    with Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, preexec_fn=os.setsid) as p:
-        try:
-            # convert stdout and stderr to strings
-            stdout, stderr = p.communicate(timeout=time_limit)
-            stdout = str(stdout)[2:-1]
-            stderr = str(stderr)[2:-1]
-            retcode = p.returncode
-
-        except TimeoutExpired:
-            os.killpg(p.pid, signal.SIGKILL)
-            err("failed to kill node - request timed out")
+    try:
+        execute("roskill {}".format(node_name))
+    except ProcessNonZeroExitException as e:
+        err("failed to kill node - non-zero exit status ({}):\n{}".format(e.code, e.stderr))
+    except ProcessTimedOutException as e:
+        err("failed to kill node - request timed out")
 
 def main():
     parser = argparse.ArgumentParser()
