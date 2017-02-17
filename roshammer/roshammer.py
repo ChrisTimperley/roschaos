@@ -6,10 +6,16 @@ import argparse
 
 # Thrown when a called process yields a non-zero exit status
 class ProcessNonZeroExitException(Exception):
-    pass
+    def __init__(code, stderr):
+        super().__init__()
+        self.code = code
+        self.stderr = stderr
+
+# Thrown when a called process times out
 class ProcessTimedOutException(Exception):
     pass
 
+# Prints an error to the stdout and exits the program with a status of 1
 def err(msg):
     print("ERROR: {}".format(msg))
     sys.exit(1)
@@ -25,7 +31,7 @@ def execute(cmd, timeout=5):
     with Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=suprocess.PIPE, preexec_fn=os.setsid) as p:
         try:
             # convert stdout and stderr to strings
-            stdout, stderr = p.communicate(timeout=time_limit)
+            stdout, stderr = p.communicate(timeout=timeout)
             stdout = str(stdout)[2:-1]
             stderr = str(stderr)[2:-1]
             retcode = p.returncode
@@ -33,6 +39,7 @@ def execute(cmd, timeout=5):
             if retcode != 0:
                 raise ProcessNonZeroExitException(retcode, stderr)
             return stdout
+
         except subprocess.TimeoutExpired:
             os.killpg(p.pid, signal.SIGKILL)
             raise ProcessTimedOutException()
