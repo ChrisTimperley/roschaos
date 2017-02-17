@@ -47,7 +47,7 @@ def execute(cmd, timeout=5):
             os.killpg(p.pid, signal.SIGKILL)
             raise ProcessTimedOutException()
 
-# Uses ROS Maste API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
+# Uses ROS Master API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
 # subscribers (sub) and services (ser). 
 def unregister(node_name, topic_service_name, task_sub_pub_ser):
     node_name = check_format(node_name)
@@ -60,8 +60,9 @@ def unregister(node_name, topic_service_name, task_sub_pub_ser):
     if task_sub_pub_ser == 'pub':
         code, statusMessage, numUnregistered = m.unregisterPublisher(node_name, topic_service_name, URI)
         print(statusMessage)
-    elif _state == 'ser':
-        code, statusMessage, numUnregistered = m.unregisterSubscriber(node_name, topic_service_name, URI)
+    elif task_sub_pub_ser == 'ser':
+        MainCode, STMAIN, URI = m.lookupService(node_name, topic_service_name)
+        code, statusMessage, numUnregistered = m.unregisterService(node_name, topic_service_name, URI)
         print(statusMessage)
 
 # TODO: Certain "respawing" nodes will refuse to die (http://wiki.ros.org/rosnode)
@@ -73,9 +74,9 @@ def kill_node(node_name):
 
     # sanity check: is this a legal ROS node name? If not, we could abuse this to perform
     # shell injection. Probably not an issue in the context we're using it, but it's worth
-    # keeping in mind.
+    # keeping in mind.( ~ Check ~)
 
-    # sanity check: is ROS running?
+    # sanity check: is ROS running? (Check)
 
     # sanity check: is there a node with the given name running?
     
