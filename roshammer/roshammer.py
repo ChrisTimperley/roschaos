@@ -172,14 +172,14 @@ def a_unregister_print_status(from_type, node_name, size, interval):
         print('Nothing to be done.')
         return False
 
-# Prints out success and failure 
+# Reports the number of successes and failures encountered
 def report_success_failure(successFailure):
     print('Success: ' + successFailure[0])
     print('Failure: ' + successFailure[1])
 
-# Iterates through the list adquired by m.getSystemState(node_name) and determines what publishers,
-# subscribers and services are linked to the given node then returns the filtered data corresponding to
-# the provided type. 
+# Iterates through the list acquired by m.getSystemState(node_name) and
+# determines which publishers, subscribers and services are linked to the given
+# node then returns the filtered data corresponding to the provided type. 
 def get_publishers_subscribers_providers(node_name, _list, all_types = False):
     toReturn_all = [[],[],[]]
     toReturn = []
