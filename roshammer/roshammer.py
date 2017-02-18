@@ -79,13 +79,21 @@ def unregister(node_name, topic_service_name, task_sub_pub_ser, quiet):
     return 0
 
 # Uses unregister to automatically unregister all publishers, subscribers and services of a given
-# node. It also allows the user to provide an specific type to unregister and an interval time between the unregistrations. 
+# node. It also allows the user to provide an specific type to unregister and an interval time
+# between the unregistrations. 
+#
+# TODO: it may be better to split this into separate functions for each type request, and to
+# then use this method as a proxy / look-up
 def a_unregister(node_name, task_sub_pub_ser_all, quiet, interval):
     m = xmlrpclib.ServerProxy(os.environ['ROS_MASTER_URI'])
+    # TODO: unpack system state into named variables here (helps comprehension)
     code, statusMessage, systemState = m.getSystemState(node_name)
+
     if task_sub_pub_ser_all == 'pub':
         publishersToRemove = get_publishers_subscribers_providers(node_name, systemState[0])
         a_unregister_print_status('publishers', node_name, len(publishersToRemove), interval)
+        # TODO: may be a *slightly* nicer to use a (successes, failures) tuple and bump
+        # to parent scope (saves a bit of boilerplate)
         successFailure = [0,0]
         for topic in publishersToRemove:
             if unregister(node_name, topic, 'pub', quiet) == 1:
