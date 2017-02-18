@@ -164,12 +164,10 @@ def a_unregister_print_status(from_type, node_name, size, interval):
         print('Nothing to be done.')
         return False
 
-
 # Prints out success and failure 
 def report_success_failure(successFailure):
     print('Success: ' + successFailure[0])
     print('Failure: ' + successFailure[1])
-
 
 # Iterates through the list adquired by m.getSystemState(node_name) and determines what publishers,
 # subscribers and services are linked to the given node then returns the filtered data corresponding to
@@ -194,8 +192,6 @@ def get_publishers_subscribers_providers(node_name, _list, all_types = False):
 
 # TODO: Certain "respawing" nodes will refuse to die (http://wiki.ros.org/rosnode)
 def kill_node(node_name, quiet):
-
-
     print("Killing node: {}".format(node_name))
 
     # sanity check: is this a legal ROS node name? If not, we could abuse this to perform
@@ -228,7 +224,7 @@ def check_ros_running():
         rostopic.get_topic_class('/rosout')
         return True
     except:
-        print('Unable to detect rosmaster. Is rosmaster running?')
+        print('WARNING: Unable to detect rosmaster. Is rosmaster running?\n')
         return False
 
 def main():
@@ -265,12 +261,10 @@ def main():
 
 
     args = parser.parse_args() 
-    if (args.ignore_rosmaster_state) == False and (ros_running == False):
-        print('ROS not detected. If you still want to run try adding -i (ex. roshammer.py -i kill-node /example )')
-        exit()
+    if not args.ignore_rosmaster_state and not ros_running:
+        err('ROS not detected. If you still want to run try adding -i (ex. roshammer.py -i kill-node /example )')
     if 'func' in vars(args):
         args.func(args)
-    
 
 if __name__ == "__main__":
     main()
