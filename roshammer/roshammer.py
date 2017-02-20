@@ -152,7 +152,7 @@ def a_unregister(node_name, task_sub_pub_ser_all, quiet, interval):
         toRemove = get_publishers_subscribers_providers(node_name, systemState, True)
         status = a_unregister_print_status('publishers, subscribers and services', node_name, len(toRemove[0]) + len(toRemove[1]) + len(toRemove[2]), interval)
         if status:
-            print('Starting publishers...')
+            print('Unregistering publishers...')
             pubSuccessFailure = [0,0]
             subSuccessFailure = [0,0]
             serSuccessFailure = [0,0]
@@ -162,14 +162,14 @@ def a_unregister(node_name, task_sub_pub_ser_all, quiet, interval):
                 else:
                     pubSuccessFailure[1] = pubSuccessFailure[1] + 1
                 time.sleep(interval)
-            print('Starting subscribers...')
+            print('Unregistering subscribers...')
             for topic in toRemove[1]:
                 if unregister(node_name, topic, 'sub', quiet) == 1:
                     subSuccessFailure[0] = subSuccessFailure[0] + 1
                 else:
                     subSuccessFailure[1] = subSuccessFailure[1] + 1
                 time.sleep(interval)
-            print ('Starting services...')
+            print ('Unregistering services...')
             for service in toRemove[2]:
                 if unregister(node_name, service, 'ser', quiet) == 1:
                     serSuccessFailure[0] = serSuccessFailure[0] + 1
