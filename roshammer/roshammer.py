@@ -9,7 +9,6 @@ import time
 from subprocess import Popen, PIPE
 from datetime import datetime
 
-
 # Thrown when a called process yields a non-zero exit status
 class ProcessNonZeroExitException(Exception):
     def __init__(self, code, stderr):
@@ -51,8 +50,11 @@ def execute(cmd, timeout=5):
             raise ProcessTimedOutException()
 
 # Uses ROS Master API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
-# subscribers (sub) and services (ser). Returns an integer reprensenting the outcome of the 
-# call, 1 success othersiwe failure #TODO maybe other states?
+# subscribers (sub) and services (ser).
+#
+# Returns an integer representing the outcome of the cal: 1 if successful, 0 if failed.
+#
+# TODO: Why return an integer rather than a boolean?
 def unregister(node_name, topic_service_name, task_sub_pub_ser, quiet):
     timeStamp = str(datetime.now())
     m = xmlrpclib.ServerProxy(os.environ['ROS_MASTER_URI'])
@@ -180,6 +182,8 @@ def report_success_failure(successFailure):
 # Iterates through the list acquired by m.getSystemState(node_name) and
 # determines which publishers, subscribers and services are linked to the given
 # node then returns the filtered data corresponding to the provided type. 
+#
+# TODO: use a tuple as the return type
 def get_publishers_subscribers_providers(node_name, _list, all_types = False):
     toReturn_all = [[],[],[]]
     toReturn = []
@@ -226,7 +230,7 @@ def check_format(_node_topic_service):
     print('')
     return node_topic_service
 
-# Checks if rosmaster is running. 
+# Checks if rosmaster is running
 def check_ros_running():
     try:
         rostopic.get_topic_class('/rosout')
@@ -250,11 +254,15 @@ def main():
 
     generate_parser = subparsers.add_parser('unregister')
     generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser'], \
-                                 help='Select type to be unregister subscriber, publisher or service',required=True)
+                                 required=True, \
+                                 help='Select type to be unregister subscriber, publisher or service'
+    # TODO: may be better as a positional argument?
     generate_parser.add_argument('-n', '--node', \
-                                 help='Node that handles the publisher, subscriber or service.', required=True)
+                                 required=True,\
+                                 help='Node that handles the publisher, subscriber or service.')
     generate_parser.add_argument('-nm', '--topic_or_service_name', \
-                                 help='Topic or service that is going to be unregister.', required=True)
+                                 required=True,\
+                                 help='Topic or service that is going to be unregister.')
     generate_parser.set_defaults(func=lambda args: unregister(check_format(args.node), check_format(args.topic_or_service_name), args.type, args.quiet))
 
     generate_parser = subparsers.add_parser('a-unregister')
