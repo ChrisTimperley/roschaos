@@ -46,8 +46,9 @@ def execute(cmd, timeout=5):
             return stdout
 
         except subprocess.TimeoutExpired:
-            os.killpg(p.pid, signal.SIGKILL)
             raise ProcessTimedOutException()
+        finally:
+            os.killpg(p.pid, signal.SIGKILL)
 
 # Causes a specified fraction (x out of y) of messages published to a given
 # topic to be dropped.
@@ -55,15 +56,15 @@ def execute(cmd, timeout=5):
 # TODO: is there a Python API for topic_tools?
 def drop(topic, x, y):
     # TODO: sanity check topic name
-
     assert x >= 0, "expected x to be an integer greater or equal to zero"
     assert y > 0, "expected y to be an integer greater than zero"
     assert isinstance(x, int), "expected x to be an integer"
     assert isinstance(y, int), "expected y to be an integer"
 
+    print("dropping {} out of {} messages on topic {}...".format(x, y, topic))
     cmd = "rosrun topic_tools {} {} {}".format(topic, x, y)
-
-    print("dropping {} out of {} messages on topic {}".format(x, y, topic))
+    execute(cmd, timeout=None)
+    print("stopped dropping messages on topic {}".format(topic))
 
 # Uses ROS Master API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
 # subscribers (sub) and services (ser).
