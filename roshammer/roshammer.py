@@ -269,12 +269,22 @@ def main():
                                  help='name of the ROS node that should be killed')
     generate_parser.set_defaults(func=lambda args: kill_node(check_format(args.name), args.quiet))
 
+    # drop
+    # TODO: is a fraction or a real better?
+    drop_parser = subparsers.add_parser('drop')
+    drop_parser.add_argument('topic', \
+                             help='Topic whose messages should be subject to dropping')
+    drop_parser.add_argument('x', type=int, \
+                             help='Numerator of fraction of messages that should be dropped')
+    drop_parser.add_argument('y', type=int, \
+                             help='Denominator of fraction of messages that should be dropped')
+    drop_parser.set_defaults(func=lambda args: drop(args.topic, args.x, args.y))
+
     # unregister
     generate_parser = subparsers.add_parser('unregister')
     generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser'], \
                                  required=True, \
                                  help='Select type to be unregister subscriber, publisher or service')
-
     # TODO: may be better as a positional argument?
     generate_parser.add_argument('-n', '--node', \
                                  required=True,\
