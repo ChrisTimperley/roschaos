@@ -51,6 +51,8 @@ def execute(cmd, timeout=5):
 
 # Causes a specified fraction (x out of y) of messages published to a given
 # topic to be dropped.
+#
+# TODO: is there a Python API for topic_tools?
 def drop(topic, x, y):
     # TODO: sanity check topic name
 
@@ -261,15 +263,18 @@ def main():
     parser.add_argument('-i', '--ignore_rosmaster_state', action='store_true', required=False)
     parser.add_argument('-q', '--quiet', action='store_true', required=False, default=False)
 
+    # kill node
     generate_parser = subparsers.add_parser('kill-node')
     generate_parser.add_argument('name', \
                                  help='name of the ROS node that should be killed')
     generate_parser.set_defaults(func=lambda args: kill_node(check_format(args.name), args.quiet))
 
+    # unregister
     generate_parser = subparsers.add_parser('unregister')
     generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser'], \
                                  required=True, \
-                                 help='Select type to be unregister subscriber, publisher or service'
+                                 help='Select type to be unregister subscriber, publisher or service')
+
     # TODO: may be better as a positional argument?
     generate_parser.add_argument('-n', '--node', \
                                  required=True,\
@@ -279,6 +284,7 @@ def main():
                                  help='Topic or service that is going to be unregister.')
     generate_parser.set_defaults(func=lambda args: unregister(check_format(args.node), check_format(args.topic_or_service_name), args.type, args.quiet))
 
+    # TODO: needs a more descriptive name
     generate_parser = subparsers.add_parser('a-unregister')
     generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser', 'all'], \
                                  help='Select type to be unregister subscriber, publisher or service. all to  \
