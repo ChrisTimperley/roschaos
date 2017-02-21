@@ -9,6 +9,7 @@ import time
 from subprocess import Popen, PIPE
 from datetime import datetime
 
+
 # Thrown when a called process yields a non-zero exit status
 class ProcessNonZeroExitException(Exception):
     def __init__(self, code, stderr):
@@ -72,6 +73,8 @@ def drop(topic, x, y):
 # Returns an integer representing the outcome of the cal: 1 if successful, 0 if failed.
 #
 # TODO: Why return an integer rather than a boolean?
+# The integer that we get returned can give us an insight in what went wrong and why the
+# task was not successfully completed. 
 def unregister(node_name, topic_service_name, task_sub_pub_ser, quiet):
     timeStamp = str(datetime.now())
     m = xmlrpclib.ServerProxy(os.environ['ROS_MASTER_URI'])
@@ -100,89 +103,86 @@ def unregister(node_name, topic_service_name, task_sub_pub_ser, quiet):
 # Uses unregister to automatically unregister all publishers, subscribers and services of a given
 # node. It also allows the user to provide an specific type to unregister and an interval time
 # between the unregistrations. 
-#
-# TODO: it may be better to split this into separate functions for each type request, and to
-# then use this method as a proxy / look-up
-def a_unregister(node_name, task_sub_pub_ser_all, quiet, interval):
+def isolate(node_name, task_sub_pub_ser_all, quiet, interval):
     m = xmlrpclib.ServerProxy(os.environ['ROS_MASTER_URI'])
-    # TODO: unpack system state into named variables here (helps comprehension)
     code, statusMessage, systemState = m.getSystemState(node_name)
+    system_publishers = systemState[0]
+    system_subscribers = systemState[1]
+    system_services = systemState[2]
 
     if task_sub_pub_ser_all == 'pub':
-        publishersToRemove = get_publishers_subscribers_providers(node_name, systemState[0])
-        a_unregister_print_status('publishers', node_name, len(publishersToRemove), interval)
-        # TODO: may be a *slightly* nicer to use a (successes, failures) tuple and bump
-        # to parent scope (saves a bit of boilerplate)
-        successFailure = [0,0]
+        report_success_failure(isolate_publishers(node_name, system_publishers, quiet, interval))
+
+    elif task_sub_pub_ser_all == 'sub':
+        report_success_failure(isolate_subcribers(node_name, system_subscribers, quiet, interval))
+
+    elif task_sub_pub_ser_all == 'ser':
+        report_success_failure(isolate_services(node_name, system_services, quiet, interval))
+
+    elif task_sub_pub_ser_all == 'all':
+        resultsSuccesFailure = [isolate_publishers(node_name, system_publishers, quiet, interval), \
+        isolate_subcribers(node_name, system_subscribers, quiet, interval), \
+        isolate_services(node_name, system_services, quiet, interval)]
+        print('Success: pulishers: '+ str(resultsSuccesFailure[0][0]) + ', subscribers: ' + \
+                str(resultsSuccesFailure[1][0]) + ', services: ' + str(resultsSuccesFailure[2][0]))
+        print('Failure: pulishers: '+ str(resultsSuccesFailure[0][1]) + ', subscribers: ' + \
+                str(resultsSuccesFailure[1][1]) + ', services: ' + str(resultsSuccesFailure[2][1]))
+
+def isolate_publishers(node_name, system_publishers, quiet, interval):
+    publishersToRemove = get_publishers_subscribers_providers(node_name, system_publishers)
+    status = isolate_print_status('publishers', node_name, len(publishersToRemove), interval)
+    # TODO: may be a *slightly* nicer to use a (successes, failures) tuple and bump
+    # to parent scope (saves a bit of boilerplate)
+    successFailure = [0,0]
+    if status:
         for topic in publishersToRemove:
-            if unregister(node_name, topic, 'pub', quiet) == 1:
+            returnedCodeValue = unregister(node_name, topic, 'pub', quiet)
+            if returnedCodeValue == 1:
                 successFailure[0] = successFailure[0] + 1
             else:
                 successFailure[1] = successFailure[1] + 1
+                print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
+                                                                    '. Topic: ' + topic)
             time.sleep(interval)
-        report_success_failure(successFailure)
+        return successFailure
 
-    elif task_sub_pub_ser_all == 'sub':
-        subscribersToRemove = get_publishers_subscribers_providers(node_name, systemState[1])
-        status = a_unregister_print_status('subscribers', node_name, len(subscribersToRemove), interval)
-        successFailure = [0,0]
-        if status:
-            for topic in subscribersToRemove:
-                if unregister(node_name, topic, 'sub', quiet) == 1:
-                    successFailure[0] = successFailure[0] + 1
-                else:
-                    successFailure[1] = successFailure[1] + 1
-                time.sleep(interval)
-            report_success_failure(successFailure)
+def isolate_subcribers(node_name, system_subscribers, quiet, interval):
+    subscribersToRemove = get_publishers_subscribers_providers(node_name, system_subscribers)
+    status = isolate_print_status('subscribers', node_name, len(subscribersToRemove), interval)
+    successFailure = [0,0]
+    if status:
+        for topic in subscribersToRemove:
+            returnedCodeValue = unregister(node_name, topic, 'sub', quiet)
+            if returnedCodeValue == 1:
+                successFailure[0] = successFailure[0] + 1
+            else:
+                successFailure[1] = successFailure[1] + 1
+                print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
+                                                                    '. Topic: ' + topic)
+            time.sleep(interval)
+        return successFailure
 
-    elif task_sub_pub_ser_all == 'ser':
-        servicesToRemove = get_publishers_subscribers_providers(node_name, systemState[2])
-        status = a_unregister_print_status('services', node_name, len(servicesToRemove), interval)
-        successFailure = [0,0]
-        if status:
-            for service in servicesToRemove:
-                if unregister(node_name, service, 'ser', quiet) == 1:
-                    successFailure[0] = successFailure[0] + 1
-                else:
-                    successFailure[1] = successFailure[1] + 1
-                time.sleep(interval)
-            report_success_failure(successFailure)
+def isolate_services(node_name, system_services, quiet, interval):
+    servicesToRemove = get_publishers_subscribers_providers(node_name, system_services)
+    status = isolate_print_status('services', node_name, len(servicesToRemove), \
+                                                                             interval)
+    successFailure = [0,0]
+    if status:
+        for service in servicesToRemove:
+            returnedCodeValue = unregister(node_name, service, 'ser', quiet)
+            if returnedCodeValue == 1:
+                successFailure[0] = successFailure[0] + 1
+            else:
+                successFailure[1] = successFailure[1] + 1
+                print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
+                                                                    ' Service: ' + service)
+            time.sleep(interval)
+        return successFailure
 
-    elif task_sub_pub_ser_all == 'all':
-        toRemove = get_publishers_subscribers_providers(node_name, systemState, True)
-        status = a_unregister_print_status('publishers, subscribers and services', node_name, len(toRemove[0]) + len(toRemove[1]) + len(toRemove[2]), interval)
-        if status:
-            print('Unregistering publishers...')
-            pubSuccessFailure = [0,0]
-            subSuccessFailure = [0,0]
-            serSuccessFailure = [0,0]
-            for topic in toRemove[0]:
-                if unregister(node_name, topic, 'pub', quiet) == 1:
-                    pubSuccessFailure[0] = pubSuccessFailure[0] + 1
-                else:
-                    pubSuccessFailure[1] = pubSuccessFailure[1] + 1
-                time.sleep(interval)
-            print('Unregistering subscribers...')
-            for topic in toRemove[1]:
-                if unregister(node_name, topic, 'sub', quiet) == 1:
-                    subSuccessFailure[0] = subSuccessFailure[0] + 1
-                else:
-                    subSuccessFailure[1] = subSuccessFailure[1] + 1
-                time.sleep(interval)
-            print ('Unregistering services...')
-            for service in toRemove[2]:
-                if unregister(node_name, service, 'ser', quiet) == 1:
-                    serSuccessFailure[0] = serSuccessFailure[0] + 1
-                else:
-                    serSuccessFailure[1] = serSuccessFailure[1] + 1
-                time.sleep(interval)
-            print('Success: pulishers: '+ str(pubSuccessFailure[0]) + ', subscribers: ' + str(subSuccessFailure[0]) + ', services: ' + str(serSuccessFailure[0]))
-            print('Failure: pulishers: '+ str(pubSuccessFailure[1]) + ', subscribers: ' + str(subSuccessFailure[1]) + ', services: ' + str(serSuccessFailure[1]))
-
-
-# Prints out the data adquired (number of tasks). If there are more than 0 tasks (unregister) then returns a true
-# state which starts the unregistration process otherwise prints that nothing will be done.
-def a_unregister_print_status(from_type, node_name, size, interval):
+# Prints out the data adquired (number of tasks). If there are more than 0 tasks (unregister) 
+# then returns a true state which starts the unregistration process otherwise prints that nothing 
+# will be done.
+def isolate_print_status(from_type, node_name, size, interval):
     print('Found [' + str(size) + '] '+ from_type +' by [' + node_name +']')
     if size is not 0:
         print('Starting automatic unregistration with an interval of ' +  str(interval) + ' seconds.')
@@ -193,8 +193,8 @@ def a_unregister_print_status(from_type, node_name, size, interval):
 
 # Reports the number of successes and failures encountered
 def report_success_failure(successFailure):
-    print('Success: ' + successFailure[0])
-    print('Failure: ' + successFailure[1])
+    print('Success: ' + str(successFailure[0]))
+    print('Failure: ' + str(successFailure[1]))
 
 # Iterates through the list acquired by m.getSystemState(node_name) and
 # determines which publishers, subscribers and services are linked to the given
@@ -242,7 +242,8 @@ def check_format(_node_topic_service):
     node_topic_service = _node_topic_service
     if node_topic_service[0] != '/':
         node_topic_service = '/' + _node_topic_service
-        print('Missing ' + repr('/') + ' at the begining of the node-topic. Modifying ' + _node_topic_service + ' to ' + node_topic_service)+'.'
+        print('Missing ' + repr('/') + ' at the begining of the node-topic. Modifying '\
+                                 + _node_topic_service + ' to ' + node_topic_service)+'.'
 
     print('')
     return node_topic_service
@@ -261,14 +262,16 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers() 
     parser.add_argument('--version', action='version', version='0.0.1')
-    parser.add_argument('-i', '--ignore_rosmaster_state', action='store_true', required=False)
+    parser.add_argument('-i', '--ignore_rosmaster_state', action='store_true', \
+                                                                            required=False)
     parser.add_argument('-q', '--quiet', action='store_true', required=False, default=False)
 
     # kill node
     generate_parser = subparsers.add_parser('kill-node')
     generate_parser.add_argument('name', \
                                  help='name of the ROS node that should be killed')
-    generate_parser.set_defaults(func=lambda args: kill_node(check_format(args.name), args.quiet))
+    generate_parser.set_defaults(func=lambda args: kill_node(check_format(args.name), \
+                                                                            args.quiet))
 
     # drop
     # TODO: is a fraction or a real better?
@@ -279,37 +282,45 @@ def main():
                              help='Numerator of fraction of messages that should be dropped')
     drop_parser.add_argument('y', type=int, \
                              help='Denominator of fraction of messages that should be dropped')
-    drop_parser.set_defaults(func=lambda args: drop(args.topic, args.x, args.y))
+    drop_parser.set_defaults(func=lambda args: drop(check_format(args.topic), args.x, args.y))
 
     # unregister
-    generate_parser = subparsers.add_parser('unregister')
-    generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser'], \
+    unregister_parser = subparsers.add_parser('unregister')
+    unregister_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser'], \
                                  required=True, \
                                  help='Select type to be unregister subscriber, publisher or service')
     # TODO: may be better as a positional argument?
-    generate_parser.add_argument('-n', '--node', \
+    # We could set it up as positional, but I think it gives more structure to the command to clarify
+    # what node we are refering to (at least in the beginning stage). 
+    unregister_parser.add_argument('-n','--node', \
                                  required=True,\
                                  help='Node that handles the publisher, subscriber or service.')
-    generate_parser.add_argument('-nm', '--topic_or_service_name', \
+    unregister_parser.add_argument('-nm', '--topic_or_service_name', \
                                  required=True,\
                                  help='Topic or service that is going to be unregister.')
-    generate_parser.set_defaults(func=lambda args: unregister(check_format(args.node), check_format(args.topic_or_service_name), args.type, args.quiet))
+    unregister_parser.set_defaults(func=lambda args: unregister(check_format(args.node), \
+                                    check_format(args.topic_or_service_name), args.type, args.quiet))
 
-    # TODO: needs a more descriptive name
-    generate_parser = subparsers.add_parser('a-unregister')
-    generate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser', 'all'], \
-                                 help='Select type to be unregister subscriber, publisher or service. all to  \
-                                    automatically remove any service, publisher or subscrieber linked to the node', required=True)
-    generate_parser.add_argument('-n', '--node', \
-                                 help='Node that handles the publishers, subscribers or services.', required=True)
-    generate_parser.add_argument('-in', '--interval', \
-                                help='Time in between each unregistration', action='store', type=float, default=1.0,required=False)
-    generate_parser.set_defaults(func=lambda args: a_unregister(check_format(args.node), args.type, args.quiet, args.interval))
+    # Isolates a given node for a type or all types. 
+    # For example; isolate -n gazebo -t all.
+    isolate_parser = subparsers.add_parser('isolate')
+    isolate_parser.add_argument('-n', '--node', \
+                                 help='Node that handles the publishers, subscribers or services.', \
+                                                                                        required=True)
+    isolate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser', 'all'], \
+                                 help='Select type to be unregiste subscriber, publisher or service. \
+    Use all to automatically remove any service, publisher or subscrieber linked to the given \
+    node.', required=True)
+    isolate_parser.add_argument('-in', '--interval', \
+                                help='Time in between each unregistration', action='store', type=float, \
+                                                                             default=1.0,required=False)
+    isolate_parser.set_defaults(func=lambda args: isolate(check_format(args.node), args.type, \
+                                                                             args.quiet, args.interval))
 
 
     args = parser.parse_args() 
     if not args.ignore_rosmaster_state and not ros_running:
-        err('ROS not detected. If you still want to run try adding -i (ex. roshammer.py -i kill-node /example )')
+        err('ROS not detected. If you still want to run try adding -i (ex. roshammer.py -i kill-node /example)')
     if 'func' in vars(args):
         args.func(args)
 
