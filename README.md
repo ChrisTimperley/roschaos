@@ -12,5 +12,5 @@ $ ./setup.py install
 
 * Kill ROS nodes
 * Unregister subscribers, publishers and service calls
-* Unregister all communications associated with a given node
+* Isolates a given node by unregistering all associated communications or by unregistering specific ones
 * Drop a specified fraction of messages published to a topic
