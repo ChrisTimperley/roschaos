@@ -70,8 +70,6 @@ def drop(topic, x, y):
 # Uses ROS Master API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
 # subscribers (sub) and services (ser).
 #
-# Returns an integer representing the outcome of the cal: 1 if successful, 0 if failed.
-#
 # TODO: Why return an integer rather than a boolean?
 # The integer that we get returned can give us an insight in what went wrong and why the
 # task was not successfully completed. 
@@ -301,8 +299,7 @@ def main():
     unregister_parser.set_defaults(func=lambda args: unregister(check_format(args.node), \
                                     check_format(args.topic_or_service_name), args.type, args.quiet))
 
-    # Isolates a given node for a type or all types. 
-    # For example; isolate -n gazebo -t all.
+    # Isolates a given node for a type or all types. For example; isolate -n gazebo -t all.
     isolate_parser = subparsers.add_parser('isolate')
     isolate_parser.add_argument('-n', '--node', \
                                  help='Node that handles the publishers, subscribers or services.', \
@@ -316,7 +313,6 @@ def main():
                                                                              default=1.0,required=False)
     isolate_parser.set_defaults(func=lambda args: isolate(check_format(args.node), args.type, \
                                                                              args.quiet, args.interval))
-
 
     args = parser.parse_args() 
     if not args.ignore_rosmaster_state and not ros_running:
