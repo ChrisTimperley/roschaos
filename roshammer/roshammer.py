@@ -29,8 +29,8 @@ def err(msg):
 # Executes a given command and returns the standard output if the process exited
 # with a non-zero status. If the process timed out, or a non-zero exit status occurred,
 # an appropriate exception is thrown.
+# TODO: double check if line 37 is working properly 
 def execute(cmd, timeout=5):
-
     # TODO: although it's better to avoid sharing the same shell as the program, we do
     #   so to avoid having to reload the catkin workspace. No big deal.
     # NOTE: os.setsid is used to ensure we kill all children in the progress group
@@ -41,7 +41,6 @@ def execute(cmd, timeout=5):
             stdout = str(stdout)[2:-1]
             stderr = str(stderr)[2:-1]
             retcode = p.returncode
-
             if retcode != 0:
                 raise ProcessNonZeroExitException(retcode, stderr)
             return stdout
@@ -55,16 +54,19 @@ def execute(cmd, timeout=5):
 # topic to be dropped.
 #
 # TODO: is there a Python API for topic_tools?
-def drop(topic, x, y):
+def drop(topic, x, y, interval, drop_count):
     # TODO: sanity check topic name
     assert x >= 0, "expected x to be an integer greater or equal to zero"
     assert y > 0, "expected y to be an integer greater than zero"
     assert isinstance(x, int), "expected x to be an integer"
     assert isinstance(y, int), "expected y to be an integer"
 
-    print("dropping {} out of {} messages on topic {}...".format(x, y, topic))
-    cmd = "rosrun topic_tools {} {} {}".format(topic, x, y)
-    execute(cmd, timeout=None)
+    for count in range(drop_count):
+        print("dropping {} out of {} messages on topic {}...".format(x, y, topic))
+        cmd = "rosrun topic_tools {} {} {}".format(topic, x, y)
+        execute(cmd, timeout=None)
+        time.sleep(interval)
+    
     print("stopped dropping messages on topic {}".format(topic))
 
 # Uses ROS Master API (http://wiki.ros.org/ROS/Master_API) to unregister publishers (pub),
@@ -109,73 +111,40 @@ def isolate(node_name, task_sub_pub_ser_all, quiet, interval):
     system_services = systemState[2]
 
     if task_sub_pub_ser_all == 'pub':
-        report_success_failure(isolate_publishers(node_name, system_publishers, quiet, interval))
+        report_success_failure(isolate_type(node_name, 'pub', system_publishers, quiet, interval))
 
     elif task_sub_pub_ser_all == 'sub':
-        report_success_failure(isolate_subcribers(node_name, system_subscribers, quiet, interval))
+        report_success_failure(isolate_type(node_name, 'sub', system_subscribers, quiet, interval))
 
     elif task_sub_pub_ser_all == 'ser':
-        report_success_failure(isolate_services(node_name, system_services, quiet, interval))
+        report_success_failure(isolate_type(node_name, 'ser', system_services, quiet, interval))
 
     elif task_sub_pub_ser_all == 'all':
-        resultsSuccesFailure = [isolate_publishers(node_name, system_publishers, quiet, interval), \
-        isolate_subcribers(node_name, system_subscribers, quiet, interval), \
-        isolate_services(node_name, system_services, quiet, interval)]
+        resultsSuccesFailure = [isolate_type(node_name, 'pub', system_publishers, quiet, interval), \
+        isolate_type(node_name, 'sub', system_subscribers, quiet, interval), \
+        isolate_type(node_name, 'ser', system_services, quiet, interval)]
         print('Success: pulishers: '+ str(resultsSuccesFailure[0][0]) + ', subscribers: ' + \
                 str(resultsSuccesFailure[1][0]) + ', services: ' + str(resultsSuccesFailure[2][0]))
         print('Failure: pulishers: '+ str(resultsSuccesFailure[0][1]) + ', subscribers: ' + \
                 str(resultsSuccesFailure[1][1]) + ', services: ' + str(resultsSuccesFailure[2][1]))
 
-def isolate_publishers(node_name, system_publishers, quiet, interval):
-    publishersToRemove = get_publishers_subscribers_providers(node_name, system_publishers)
-    status = isolate_print_status('publishers', node_name, len(publishersToRemove), interval)
-    # TODO: may be a *slightly* nicer to use a (successes, failures) tuple and bump
-    # to parent scope (saves a bit of boilerplate)
-    successFailure = [0,0]
+def isolate_type(node_name, _type, system_pub_sub_ser, quiet, interval):
+    types = {'pub' : 'publishers', 'sub' : 'subscribers', 'ser' : 'services'}
+    to_remove = get_publishers_subscribers_providers(node_name, system_pub_sub_ser)
+    status = isolate_print_status(types[_type], node_name, len(to_remove), interval)
+    success_failure = [0,0]
     if status:
-        for topic in publishersToRemove:
-            returnedCodeValue = unregister(node_name, topic, 'pub', quiet)
+        for current_type in to_remove:
+            returnedCodeValue = unregister(node_name, current_type, _type, quiet)
             if returnedCodeValue == 1:
-                successFailure[0] = successFailure[0] + 1
+                success_failure[0] = success_failure[0] + 1
             else:
-                successFailure[1] = successFailure[1] + 1
+                success_failure[1] = success_failure[1] + 1
                 print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
-                                                                    '. Topic: ' + topic)
+                                                        '. Topic/Service: ' + current_type)
             time.sleep(interval)
-        return successFailure
+        return success_failure
 
-def isolate_subcribers(node_name, system_subscribers, quiet, interval):
-    subscribersToRemove = get_publishers_subscribers_providers(node_name, system_subscribers)
-    status = isolate_print_status('subscribers', node_name, len(subscribersToRemove), interval)
-    successFailure = [0,0]
-    if status:
-        for topic in subscribersToRemove:
-            returnedCodeValue = unregister(node_name, topic, 'sub', quiet)
-            if returnedCodeValue == 1:
-                successFailure[0] = successFailure[0] + 1
-            else:
-                successFailure[1] = successFailure[1] + 1
-                print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
-                                                                    '. Topic: ' + topic)
-            time.sleep(interval)
-        return successFailure
-
-def isolate_services(node_name, system_services, quiet, interval):
-    servicesToRemove = get_publishers_subscribers_providers(node_name, system_services)
-    status = isolate_print_status('services', node_name, len(servicesToRemove), \
-                                                                             interval)
-    successFailure = [0,0]
-    if status:
-        for service in servicesToRemove:
-            returnedCodeValue = unregister(node_name, service, 'ser', quiet)
-            if returnedCodeValue == 1:
-                successFailure[0] = successFailure[0] + 1
-            else:
-                successFailure[1] = successFailure[1] + 1
-                print ('Failed by code: ' + returnedCodeValue + '. Node: ' + node_name + \
-                                                                    ' Service: ' + service)
-            time.sleep(interval)
-        return successFailure
 
 # Prints out the data adquired (number of tasks). If there are more than 0 tasks (unregister) 
 # then returns a true state which starts the unregistration process otherwise prints that nothing 
@@ -188,6 +157,7 @@ def isolate_print_status(from_type, node_name, size, interval):
     else:
         print('Nothing to be done.')
         return False
+
 
 # Reports the number of successes and failures encountered
 def report_success_failure(successFailure):
@@ -280,7 +250,12 @@ def main():
                              help='Numerator of fraction of messages that should be dropped')
     drop_parser.add_argument('y', type=int, \
                              help='Denominator of fraction of messages that should be dropped')
-    drop_parser.set_defaults(func=lambda args: drop(check_format(args.topic), args.x, args.y))
+    drop_parser.add_argument('-in', '--interval', \
+                            help='Time in between each drop.', type=float, default=1.0, required=False)
+    drop_parser.add_argument('-dc', '--drop_count', \
+                            help='Determine amount of drops needed.', type=int, default=1, required=False )
+    drop_parser.set_defaults(func=lambda args: drop(check_format(args.topic), args.x, args.y, args.interval, \
+                                args.drop_count))
 
     # unregister
     unregister_parser = subparsers.add_parser('unregister')
@@ -305,12 +280,12 @@ def main():
                                  help='Node that handles the publishers, subscribers or services.', \
                                                                                         required=True)
     isolate_parser.add_argument('-t', '--type', choices=['pub', 'sub', 'ser', 'all'], \
-                                 help='Select type to be unregiste subscriber, publisher or service. \
+                                 help='Select type to unregister; subscriber, publisher or service. \
     Use all to automatically remove any service, publisher or subscrieber linked to the given \
     node.', required=True)
     isolate_parser.add_argument('-in', '--interval', \
                                 help='Time in between each unregistration', action='store', type=float, \
-                                                                             default=1.0,required=False)
+                                                                             default=0.5,required=False)
     isolate_parser.set_defaults(func=lambda args: isolate(check_format(args.node), args.type, \
                                                                              args.quiet, args.interval))
 
